@@ -1,0 +1,32 @@
+RETRACTED: Investigation of the metallurgical microstructure resulting from underwater welding at depths of 3 and 5 meters using UW-1 and E6013 welding electrodes
+期刊：Asia-Pacific Journal of Science and Technology
+DOI：10.14456/apst.2025.98
+异常类型：引文不存在
+证据：撤稿说明明确写到，31 条参考文献中有 13 条无法在学术数据库或学术库中验证，且原始引用“不存在”。
+页面/PDF：APST 文章页
+这个最适合，因为页面上有 PDF，且证据非常明确。
+
+Local government in Thailand: A way forward
+期刊：Cogent Social Sciences
+原文 DOI：10.1080/23311886.2023.2268972
+撤稿 DOI：10.1080/23311886.2024.2342626
+异常类型：多条参考文献无法找到或验证
+证据：撤稿声明列出了多条无法找到/无法验证的参考文献，并提到另有不准确引用。
+撤稿声明：Taylor & Francis
+
+From policy to practice: mainstreaming climate change strategies into local development plan of coastal communities in Ghana—evidence from Effutu Municipal Assembly
+期刊：Local Environment
+原文 DOI：10.1080/13549839.2025.2502999
+撤稿 DOI：10.1080/13549839.2025.2537548
+异常类型：多条参考文献无法找到或验证
+证据：撤稿声明明确列出一批无法找到或验证的参考文献。
+撤稿声明：Taylor & Francis
+撤稿 PDF：PDF
+
+New materialist thought and moral education: Reconstruction of moral education through agential realism, posthumanism, and new materialism
+期刊：Educational Philosophy and Theory
+原文 DOI：10.1080/00131857.2025.2528857
+撤稿 DOI：10.1080/00131857.2025.2546749
+异常类型：参考文献无法找到或验证
+证据：撤稿声明说明参考文献准确性受到质疑，调查后发现部分参考文献无法找到或验证。
+撤稿 PDF：Taylor & Francis PDF

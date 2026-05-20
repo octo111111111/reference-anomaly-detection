@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reference-anomaly-detection"
+version = "0.4.0"
+description = "参考文献 DOI 校验与撤稿文献检测"
+readme = "architecture.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pymupdf>=1.24.0",
+    "python-docx>=1.1.0",
+    "pydantic>=2.0.0",
+    "requests>=2.31.0",
+    "rapidfuzz>=3.0.0",
+    "PyYAML>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0"]
+
+[project.scripts]
+reference-parse = "reference_anomaly_detection.main:main"
+reference-extract = "reference_anomaly_detection.extract_main:main"
+reference-check-doi = "reference_anomaly_detection.doi_check_main:main"
+reference-build-retraction-index = "reference_anomaly_detection.build_retraction_index_main:main"
+reference-check-retraction = "reference_anomaly_detection.retraction_check_main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["reference_anomaly_detection*"]
+
+[tool.setuptools.package-data]
+reference_anomaly_detection = ["config/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["reference_anomaly_detection/tests"]
+pythonpath = ["."]

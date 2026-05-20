@@ -1,0 +1,34 @@
+{
+  "paper_id": "demo",
+  "title": "Sample Paper Title",
+  "abstract": "This paper studies citation parsing for reference checks.",
+  "keywords": [
+    "parsing",
+    "references",
+    "doi"
+  ],
+  "body_text": "Sample Paper Title\nAbstract\nThis paper studies citation parsing for reference checks.\nKeywords: parsing, references, doi\n1. Introduction\nPrevious work has shown important results [1] and follow-up [2-3].\nSmith et al. also reported similar findings (Jones, 2019).\n2. Methods\nWe applied standard procedures [1].",
+  "reference_section_text": "[1] Smith J. Example title. Journal A. 2020;1(1):1-10. doi:10.1000/example.1\n[2] Doe A. Another study. Science. 2019;5:100-110. doi:10.1000/example.2",
+  "citation_contexts": [
+    {
+      "citation_marker": "[1]",
+      "context": "sing for reference checks. Keywords: parsing, references, doi 1. Introduction Previous work has shown important results [1] and follow-up [2-3]. Smith et al. also reported similar findings (Jones, 2019). 2. Methods We applied standard procedur",
+      "section": "Introduction"
+    },
+    {
+      "citation_marker": "[1]",
+      "context": "d follow-up [2-3]. Smith et al. also reported similar findings (Jones, 2019). 2. Methods We applied standard procedures [1].",
+      "section": "Methods"
+    },
+    {
+      "citation_marker": "[2-3]",
+      "context": "checks. Keywords: parsing, references, doi 1. Introduction Previous work has shown important results [1] and follow-up [2-3]. Smith et al. also reported similar findings (Jones, 2019). 2. Methods We applied standard procedures [1].",
+      "section": "Introduction"
+    },
+    {
+      "citation_marker": "(Jones, 2019)",
+      "context": "oduction Previous work has shown important results [1] and follow-up [2-3]. Smith et al. also reported similar findings (Jones, 2019). 2. Methods We applied standard procedures [1].",
+      "section": "Introduction"
+    }
+  ]
+}

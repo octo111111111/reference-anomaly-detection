@@ -1,0 +1,2 @@
+# 撤稿索引 SQLite 默认路径（相对于项目根或绝对路径）
+default_index_path: reference_anomaly_detection/config/retraction_watch_index.sqlite
