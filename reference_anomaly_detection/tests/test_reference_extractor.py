@@ -49,6 +49,16 @@ class TestReferenceExtractorHelpers:
         assert entries[0][0] == ["[1]"]
         assert "Smith J" in entries[0][1]
 
+    def test_split_marker_on_own_line(self) -> None:
+        text = (
+            "[1]\n"
+            "Smith J. Example. Journal. 2020.\n"
+            "[2]\n"
+            "Doe A. Another. Science. 2019.\n"
+        )
+        entries = _split_raw_entries(text)
+        assert len(entries) == 2
+
 
 class TestReferenceExtractor:
     def setup_method(self) -> None:

@@ -16,12 +16,12 @@ from reference_anomaly_detection.parsers.citation_context_extractor import (
 from reference_anomaly_detection.utils.paper_id import generate_paper_id
 
 REFERENCE_HEADING_PATTERNS = [
-    r"^references?\s*$",
-    r"^bibliography\s*$",
-    r"^literature\s+cited\s*$",
-    r"^works?\s+cited\s*$",
-    r"^参考文献\s*$",
-    r"^引用文献\s*$",
+    r"^(?:\d+\.?\s*)?references?\s*$",
+    r"^(?:\d+\.?\s*)?bibliography\s*$",
+    r"^(?:\d+\.?\s*)?literature\s+cited\s*$",
+    r"^(?:\d+\.?\s*)?works?\s+cited\s*$",
+    r"^(?:\d+\.?\s*)?参考文献\s*$",
+    r"^(?:\d+\.?\s*)?引用文献\s*$",
 ]
 
 REFERENCE_HEADING_RE = re.compile(

@@ -57,6 +57,17 @@ class TestDocumentParserHelpers:
         assert "References" not in body
         assert "[1]" in body
 
+    def test_split_reference_section_numbered_heading(self) -> None:
+        text = (
+            "1. Introduction\nBody text [1].\n\n"
+            "6. References\n"
+            "[1] Smith J. Example. Journal. 2020.\n"
+        )
+        ref, body = self.parser._split_reference_section(text)
+        assert ref is not None
+        assert "Smith J" in ref
+        assert "6. References" not in body
+
     def test_extract_abstract_and_keywords(self) -> None:
         abstract = self.parser._extract_abstract(SAMPLE_TEXT)
         keywords = self.parser._extract_keywords(SAMPLE_TEXT)

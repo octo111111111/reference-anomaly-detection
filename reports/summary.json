@@ -1,0 +1,36 @@
+{
+  "module": "reference_anomaly_detection",
+  "paper_id": "paper_b0d05cc6de0e",
+  "risk_items": [
+    {
+      "risk_type": "reference_anomaly",
+      "severity": "low",
+      "confidence": 0.9,
+      "evidence": "参考文献中 32 条存在 DOI/元数据风险。",
+      "location": "References",
+      "review_required": true,
+      "suggested_action": "请作者补充或核对 DOI"
+    },
+    {
+      "risk_type": "doi_missing_doi",
+      "severity": "low",
+      "confidence": 0.95,
+      "evidence": "32 条参考文献标记为 missing_doi",
+      "location": "References",
+      "review_required": false,
+      "suggested_action": "请作者补充或核对 DOI"
+    }
+  ],
+  "summary": {
+    "total_references": 32,
+    "doi_found_count": 0,
+    "doi_missing_count": 32,
+    "doi_not_found_count": 0,
+    "doi_mismatch_count": 0,
+    "doi_issue_count": 32,
+    "retracted_reference_count": 0,
+    "retraction_notice_count": 0
+  },
+  "retraction_check_skipped": false,
+  "retraction_skip_reason": null
+}

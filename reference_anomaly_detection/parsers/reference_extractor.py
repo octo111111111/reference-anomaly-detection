@@ -11,7 +11,7 @@ from reference_anomaly_detection.models.schemas import (
 
 # 单条参考文献起始： [1]、[2-3]、1.、2.
 _ENTRY_START_RE = re.compile(
-    r"^\s*(?:\[(\d+(?:\s*[-–,]\s*\d+)*)\]|(\d+)\.)\s+",
+    r"^\s*(?:\[(\d+(?:\s*[-–,]\s*\d+)*)\]|(\d+)\.)\s*",
     re.MULTILINE,
 )
 

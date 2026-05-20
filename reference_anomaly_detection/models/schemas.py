@@ -97,3 +97,42 @@ class RetractionCheckResult(BaseModel):
 class RetractionCheckBatchResult(BaseModel):
     paper_id: str
     retraction_checks: list[RetractionCheckResult] = Field(default_factory=list)
+
+
+class RiskSummaryInput(BaseModel):
+    paper_id: str
+    references: list[ReferenceItem] = Field(default_factory=list)
+    doi_checks: list[DoiCheckResult] = Field(default_factory=list)
+    retraction_checks: list[RetractionCheckResult] = Field(default_factory=list)
+    retraction_check_skipped: bool = False
+    retraction_skip_reason: str | None = None
+
+
+class RiskItem(BaseModel):
+    risk_type: str
+    severity: Literal["high", "medium", "low"]
+    confidence: float
+    evidence: str
+    location: str = "References"
+    review_required: bool = True
+    suggested_action: str
+
+
+class RiskSummaryStats(BaseModel):
+    total_references: int = 0
+    doi_found_count: int = 0
+    doi_missing_count: int = 0
+    doi_not_found_count: int = 0
+    doi_mismatch_count: int = 0
+    doi_issue_count: int = 0
+    retracted_reference_count: int = 0
+    retraction_notice_count: int = 0
+
+
+class RiskSummaryResult(BaseModel):
+    module: str = "reference_anomaly_detection"
+    paper_id: str
+    risk_items: list[RiskItem] = Field(default_factory=list)
+    summary: RiskSummaryStats
+    retraction_check_skipped: bool = False
+    retraction_skip_reason: str | None = None

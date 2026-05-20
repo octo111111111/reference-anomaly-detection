@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reference-anomaly-detection"
-version = "0.4.0"
-description = "参考文献 DOI 校验与撤稿文献检测"
+version = "0.5.0"
+description = "参考文献异常检测：解析、DOI 校验、撤稿检测与风险汇总"
 readme = "architecture.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -26,6 +26,8 @@ reference-extract = "reference_anomaly_detection.extract_main:main"
 reference-check-doi = "reference_anomaly_detection.doi_check_main:main"
 reference-build-retraction-index = "reference_anomaly_detection.build_retraction_index_main:main"
 reference-check-retraction = "reference_anomaly_detection.retraction_check_main:main"
+reference-summarize = "reference_anomaly_detection.summarize_main:main"
+reference-run = "reference_anomaly_detection.run_main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
