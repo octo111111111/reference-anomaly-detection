@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import time
@@ -10,8 +11,11 @@ from urllib.parse import quote
 
 import requests
 
+from reference_anomaly_detection.services.text_match import normalize_text, text_similarity
+
 DEFAULT_MAILTO = "reference-anomaly-detection@example.com"
 CROSSREF_WORKS_URL = "https://api.crossref.org/works/{doi}"
+CROSSREF_WORKS_SEARCH_URL = "https://api.crossref.org/works"
 
 
 @dataclass(frozen=True)
@@ -68,6 +72,15 @@ class CrossrefClient:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS crossref_search_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    payload TEXT NOT NULL,
+                    fetched_at REAL NOT NULL
+                )
+                """
+            )
 
     def _cache_get(self, doi: str) -> tuple[str, dict[str, Any] | None] | None:
         if not self.cache_enabled:
@@ -119,6 +132,141 @@ class CrossrefClient:
             return None
         self._cache_set(normalized, "found", payload)
         return self._parse_work(normalized, payload)
+
+    def search_works_by_bibliographic(
+        self,
+        *,
+        title: str | None,
+        year: int | None = None,
+        journal: str | None = None,
+        author: str | None = None,
+        rows: int = 5,
+    ) -> list[CrossrefWork]:
+        """按书目信息检索 Crossref，返回按题名相似度排序的结果。"""
+        if not title or not title.strip():
+            return []
+
+        cache_key = self._search_cache_key(title, year, journal, author, rows)
+        cached = self._search_cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        params: dict[str, Any] = {
+            "mailto": self.mailto,
+            "rows": rows,
+            "query.title": title.strip(),
+        }
+        if author:
+            params["query.author"] = author
+        if journal:
+            params["query.container-title"] = journal
+        filters: list[str] = []
+        if year is not None:
+            filters.append(f"from-pub-date:{year}")
+            filters.append(f"until-pub-date:{year}")
+        if filters:
+            params["filter"] = ",".join(filters)
+
+        items = self._request_search(params)
+        works: list[CrossrefWork] = []
+        for item in items:
+            item_doi = item.get("DOI")
+            if not item_doi:
+                continue
+            normalized = self.normalize_doi(item_doi)
+            works.append(self._parse_work(normalized, item))
+
+        works.sort(
+            key=lambda w: text_similarity(title, w.title) or 0.0,
+            reverse=True,
+        )
+        self._search_cache_set(cache_key, works)
+        return works
+
+    @staticmethod
+    def _search_cache_key(
+        title: str,
+        year: int | None,
+        journal: str | None,
+        author: str | None,
+        rows: int,
+    ) -> str:
+        raw = "|".join(
+            [
+                normalize_text(title),
+                str(year or ""),
+                normalize_text(journal),
+                normalize_text(author),
+                str(rows),
+            ]
+        )
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _search_cache_get(self, cache_key: str) -> list[CrossrefWork] | None:
+        if not self.cache_enabled:
+            return None
+        with sqlite3.connect(self.cache_path) as conn:
+            row = conn.execute(
+                "SELECT payload FROM crossref_search_cache WHERE cache_key = ?",
+                (cache_key,),
+            ).fetchone()
+        if row is None:
+            return None
+        data = json.loads(row[0])
+        return [
+            CrossrefWork(
+                doi=item["doi"],
+                title=item.get("title"),
+                journal=item.get("journal"),
+                year=item.get("year"),
+                authors=item.get("authors") or [],
+            )
+            for item in data
+        ]
+
+    def _search_cache_set(self, cache_key: str, works: list[CrossrefWork]) -> None:
+        if not self.cache_enabled:
+            return
+        payload = [
+            {
+                "doi": w.doi,
+                "title": w.title,
+                "journal": w.journal,
+                "year": w.year,
+                "authors": w.authors,
+            }
+            for w in works
+        ]
+        with sqlite3.connect(self.cache_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO crossref_search_cache (cache_key, payload, fetched_at)
+                VALUES (?, ?, ?)
+                """,
+                (cache_key, json.dumps(payload), time.time()),
+            )
+
+    def _request_search(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries):
+            try:
+                response = self._session.get(
+                    CROSSREF_WORKS_SEARCH_URL,
+                    params=params,
+                    timeout=self.timeout_seconds,
+                )
+                response.raise_for_status()
+                body = response.json()
+                message = body.get("message") or {}
+                items = message.get("items") or []
+                return items if isinstance(items, list) else []
+            except requests.RequestException as exc:
+                last_error = exc
+                if attempt + 1 < self.max_retries:
+                    time.sleep(0.5 * (attempt + 1))
+        raise CrossrefClientError(
+            f"Crossref 书目检索失败: {last_error}"
+        ) from last_error
 
     def _request_work(self, doi: str) -> tuple[dict[str, Any], bool]:
         url = CROSSREF_WORKS_URL.format(doi=quote(doi, safe="/"))

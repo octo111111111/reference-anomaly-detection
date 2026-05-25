@@ -221,12 +221,17 @@
 | DOI 存在但期刊不匹配 | 中 | 可能为期刊缩写解析错误，也可能为元数据异常 |
 | 无 DOI | 低到中 | 只提示复核，不能直接判异常 |
 
-### 5.6 主要难点
+### 5.6 无 DOI 时的书目解析（已实现）
+
+对 `doi` 为空的参考文献，在模块三校验前调用 Crossref `works` 书目检索（`query.title` 等），将得分不低于 `doi_resolve_threshold` 的候选 DOI 作为 `doi_source=resolved` 的补充校验，不修改原始 `ReferenceItem`。
+
+### 5.7 主要难点
 
 - Crossref 元数据可能缺失或格式不统一；
 - 期刊名可能存在缩写、旧名、新名；
 - 作者名存在缩写、大小写、顺序差异；
-- 旧文献、中文文献、书籍章节 DOI 覆盖不足。
+- 旧文献、中文文献、书籍章节 DOI 覆盖不足；
+- 书目解析可能误匹配重名文献，需结合期刊/年份与人工复核。
 
 ## 6. 模块四：撤稿文献检测模块
 
@@ -299,14 +304,17 @@ source_url
 updated_at
 ```
 
-检测时优先本地匹配：
+检测时按以下顺序匹配（已实现）：
 
 ```text
-reference DOI → original_doi
-reference DOI → retraction_doi
+reference DOI → original_doi / retraction_doi（有 DOI 时不做题名回退）
+resolved DOI（模块三书目解析）→ original_doi / retraction_doi
+reference title（FTS 召回 + rapidfuzz）→ 撤稿记录 title
 ```
 
-如本地无匹配，再尝试 Crossref update metadata 或 PubMed 状态补充。
+本地索引含 `title_normalized` 与 FTS5 虚表 `retraction_title_fts`；阈值见 `config/retraction.yaml`。
+
+如本地无匹配，可再尝试 Crossref update metadata 或 PubMed 状态补充（尚未实现）。
 
 ### 6.6 主要难点
 

@@ -39,6 +39,7 @@ class TestRunPipeline:
         client = MagicMock()
         client.normalize_doi.side_effect = lambda d: d.lower().strip()
         client.fetch_work.side_effect = lambda doi: _mock_crossref_work(doi)
+        client.search_works_by_bibliographic.return_value = []
 
         with patch(
             "reference_anomaly_detection.pipeline.CrossrefClient",
@@ -54,6 +55,7 @@ class TestRunPipeline:
         assert intermediates["parse"].reference_section_text
         assert len(intermediates["extract"].references) >= 1
         assert len(intermediates["doi_checks"].doi_checks) >= 1
+        assert intermediates["doi_resolve"] is not None
         assert intermediates["retraction_checks"] is not None
         summary_text = format_cli_summary(report)
         assert report.paper_id in summary_text
@@ -65,6 +67,7 @@ class TestRunPipeline:
         client = MagicMock()
         client.normalize_doi.side_effect = lambda d: d.lower().strip()
         client.fetch_work.side_effect = lambda doi: _mock_crossref_work(doi)
+        client.search_works_by_bibliographic.return_value = []
 
         with patch(
             "reference_anomaly_detection.pipeline.CrossrefClient",
@@ -87,6 +90,7 @@ class TestRunPipeline:
         client = MagicMock()
         client.normalize_doi.side_effect = lambda d: d.lower().strip()
         client.fetch_work.side_effect = lambda doi: _mock_crossref_work(doi)
+        client.search_works_by_bibliographic.return_value = []
 
         out_json = tmp_path / "summary.json"
         with patch(

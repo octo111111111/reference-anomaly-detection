@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "reference-anomaly-detection"
 version = "0.5.0"
 description = "参考文献异常检测：解析、DOI 校验、撤稿检测与风险汇总"
-readme = "architecture.md"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "pymupdf>=1.24.0",

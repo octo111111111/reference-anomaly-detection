@@ -30,3 +30,17 @@ New materialist thought and moral education: Reconstruction of moral education t
 异常类型：参考文献无法找到或验证
 证据：撤稿声明说明参考文献准确性受到质疑，调查后发现部分参考文献无法找到或验证。
 撤稿 PDF：Taylor & Francis PDF
+
+论文标题：Artificial intelligence to enhance hemodynamic management in the ICU
+期刊：Intensive Care Medicine
+出版社：Springer Nature
+文章类型：Letter
+发表时间：2024-12-23
+撤稿时间：2025-11-29
+DOI：10.1007/s00134-024-07752-6
+
+异常点：
+该文有 15 条参考文献。Retraction Watch 报道称，其中 10 条找不到对应论文；第 11 条甚至声称是发表在 Intensive Care Medicine 本刊上的文章，但查不到该文，也查不到对应作者在该刊发表过这篇文章。
+
+撤稿原因：
+Springer 页面上的撤稿说明写明，很多参考文献无法在科学记录中验证；作者称这些不存在的参考文献来自使用生成式 AI 将 PubMed ID 转换为结构化参考文献列表的过程。撤稿通知还提到同行评议流程未按期刊政策执行。

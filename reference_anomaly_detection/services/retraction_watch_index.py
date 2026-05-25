@@ -10,6 +10,12 @@ from typing import Any, Iterable
 import yaml
 
 from reference_anomaly_detection.services.crossref_client import CrossrefClient
+from reference_anomaly_detection.services.journal_match import JournalMatcher
+from reference_anomaly_detection.services.text_match import (
+    fts_query_from_title,
+    normalize_text,
+    text_similarity,
+)
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 
@@ -67,18 +73,37 @@ def _normalize_doi_value(value: str | None) -> str | None:
         return None
 
 
+def _load_retraction_config() -> dict[str, Any]:
+    path = _CONFIG_DIR / "retraction.yaml"
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    return data if isinstance(data, dict) else {}
+
+
+def _load_thresholds() -> dict[str, Any]:
+    path = _CONFIG_DIR / "thresholds.yaml"
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    return data if isinstance(data, dict) else {}
+
+
 @dataclass(frozen=True)
 class RetractionRecord:
-    original_doi: str | None
-    retraction_doi: str | None
-    title: str | None
-    journal: str | None
-    publisher: str | None
-    retraction_nature: str | None
-    retraction_date: str | None
-    reason: str | None
-    source_record_id: str | None
-    source_url: str | None
+    record_id: int | None = None
+    original_doi: str | None = None
+    retraction_doi: str | None = None
+    title: str | None = None
+    journal: str | None = None
+    publisher: str | None = None
+    retraction_nature: str | None = None
+    retraction_date: str | None = None
+    reason: str | None = None
+    source_record_id: str | None = None
+    source_url: str | None = None
 
 
 class RetractionWatchIndexError(RuntimeError):
@@ -95,6 +120,20 @@ class RetractionWatchIndex:
                 f"撤稿索引不存在: {self.db_path}\n"
                 "请先运行: reference-build-retraction-index --csv <RetractionWatch.csv>"
             )
+        config = _load_retraction_config()
+        thresholds = _load_thresholds()
+        self._fts_top_k = int(config.get("fts_top_k", 20))
+        self._title_match_threshold = float(
+            config.get("retraction_title_match_threshold", 0.92)
+        )
+        self._title_review_threshold = float(
+            config.get("retraction_title_review_threshold", 0.85)
+        )
+        self._journal_threshold = float(
+            thresholds.get("doi_journal_match_threshold", 0.75)
+        )
+        self._year_tolerance = int(thresholds.get("doi_year_tolerance", 1))
+        self._journal_matcher = JournalMatcher()
 
     @staticmethod
     def default_db_path() -> Path:
@@ -136,7 +175,17 @@ class RetractionWatchIndex:
                     record = cls._row_to_record(row, column_map)
                     if not record.original_doi and not record.retraction_doi:
                         continue
-                    cls._insert_record(conn, record, built_at)
+                    record_id = cls._insert_record(conn, record, built_at)
+                    if record.title:
+                        title_norm = normalize_text(record.title)
+                        if title_norm:
+                            conn.execute(
+                                """
+                                INSERT INTO retraction_title_fts (rowid, title_normalized)
+                                VALUES (?, ?)
+                                """,
+                                (record_id, title_norm),
+                            )
                     inserted += 1
             conn.commit()
         finally:
@@ -159,6 +208,7 @@ class RetractionWatchIndex:
                 original_doi TEXT,
                 retraction_doi TEXT,
                 title TEXT,
+                title_normalized TEXT,
                 journal TEXT,
                 publisher TEXT,
                 retraction_nature TEXT,
@@ -176,11 +226,20 @@ class RetractionWatchIndex:
         conn.execute(
             "CREATE INDEX idx_retraction_doi ON retraction_records(retraction_doi)"
         )
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE retraction_title_fts USING fts5(
+                title_normalized,
+                tokenize='unicode61'
+            )
+            """
+        )
 
     @classmethod
     def _row_to_record(
         cls, row: dict[str, str], column_map: dict[str, str]
     ) -> RetractionRecord:
+        title = _cell(row, column_map.get("title"))
         return RetractionRecord(
             original_doi=_normalize_doi_value(
                 _cell(row, column_map.get("original_doi"))
@@ -188,7 +247,7 @@ class RetractionWatchIndex:
             retraction_doi=_normalize_doi_value(
                 _cell(row, column_map.get("retraction_doi"))
             ),
-            title=_cell(row, column_map.get("title")),
+            title=title,
             journal=_cell(row, column_map.get("journal")),
             publisher=_cell(row, column_map.get("publisher")),
             retraction_nature=_cell(row, column_map.get("retraction_nature")),
@@ -203,19 +262,21 @@ class RetractionWatchIndex:
         conn: sqlite3.Connection,
         record: RetractionRecord,
         built_at: float,
-    ) -> None:
-        conn.execute(
+    ) -> int:
+        title_norm = normalize_text(record.title) if record.title else None
+        cursor = conn.execute(
             """
             INSERT INTO retraction_records (
-                original_doi, retraction_doi, title, journal, publisher,
-                retraction_nature, retraction_date, reason,
+                original_doi, retraction_doi, title, title_normalized, journal,
+                publisher, retraction_nature, retraction_date, reason,
                 source_record_id, source_url, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record.original_doi,
                 record.retraction_doi,
                 record.title,
+                title_norm,
                 record.journal,
                 record.publisher,
                 record.retraction_nature,
@@ -226,6 +287,7 @@ class RetractionWatchIndex:
                 built_at,
             ),
         )
+        return int(cursor.lastrowid)
 
     def lookup_by_original_doi(self, doi: str) -> RetractionRecord | None:
         normalized = _normalize_doi_value(doi)
@@ -247,13 +309,114 @@ class RetractionWatchIndex:
             (normalized,),
         )
 
+    def lookup_by_title(
+        self,
+        title: str | None,
+        *,
+        year: int | None = None,
+        journal: str | None = None,
+        top_k: int | None = None,
+    ) -> list[tuple[RetractionRecord, float]]:
+        if not title or not normalize_text(title):
+            return []
+
+        limit = top_k or self._fts_top_k
+        candidates = self._fts_candidates(title, limit=limit)
+        if not candidates:
+            candidates = self._fallback_title_scan(title, limit=limit)
+
+        scored: list[tuple[RetractionRecord, float]] = []
+        for record in candidates:
+            if not record.title:
+                continue
+            score = text_similarity(title, record.title)
+            if score is None:
+                continue
+            if journal and record.journal:
+                j_score = self._journal_matcher.similarity(journal, record.journal)
+                if j_score is not None and j_score < self._journal_threshold:
+                    continue
+            scored.append((record, score))
+
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return scored
+
+    def best_title_match(
+        self,
+        title: str | None,
+        *,
+        year: int | None = None,
+        journal: str | None = None,
+    ) -> tuple[RetractionRecord, float] | None:
+        matches = self.lookup_by_title(title, year=year, journal=journal)
+        if not matches:
+            return None
+        record, score = matches[0]
+        if score < self._title_review_threshold:
+            return None
+        return record, score
+
+    @property
+    def title_match_threshold(self) -> float:
+        return self._title_match_threshold
+
+    @property
+    def title_review_threshold(self) -> float:
+        return self._title_review_threshold
+
+    def _fts_candidates(self, title: str, *, limit: int) -> list[RetractionRecord]:
+        query = fts_query_from_title(title)
+        if not query:
+            return []
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """
+                    SELECT r.*
+                    FROM retraction_title_fts AS fts
+                    JOIN retraction_records AS r ON r.id = fts.rowid
+                    WHERE retraction_title_fts MATCH ?
+                    ORDER BY rank
+                    LIMIT ?
+                    """,
+                    (query, limit),
+                ).fetchall()
+        except sqlite3.OperationalError:
+            return []
+        return [self._row_to_record_obj(row) for row in rows]
+
+    def _fallback_title_scan(self, title: str, *, limit: int) -> list[RetractionRecord]:
+        prefix = normalize_text(title)[:40]
+        if not prefix:
+            return []
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM retraction_records
+                WHERE title_normalized IS NOT NULL
+                  AND title_normalized LIKE ?
+                LIMIT ?
+                """,
+                (f"%{prefix[:24]}%", limit * 3),
+            ).fetchall()
+        return [self._row_to_record_obj(row) for row in rows]
+
     def _fetch_one(self, query: str, params: tuple[str, ...]) -> RetractionRecord | None:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(query, params).fetchone()
         if row is None:
             return None
+        return self._row_to_record_obj(row)
+
+    @staticmethod
+    def _row_to_record_obj(row: sqlite3.Row) -> RetractionRecord:
+        keys = row.keys()
+        record_id = row["id"] if "id" in keys else None
         return RetractionRecord(
+            record_id=int(record_id) if record_id is not None else None,
             original_doi=row["original_doi"],
             retraction_doi=row["retraction_doi"],
             title=row["title"],
@@ -265,12 +428,3 @@ class RetractionWatchIndex:
             source_record_id=row["source_record_id"],
             source_url=row["source_url"],
         )
-
-
-def _load_retraction_config() -> dict[str, Any]:
-    path = _CONFIG_DIR / "retraction.yaml"
-    if not path.exists():
-        return {}
-    with path.open(encoding="utf-8") as handle:
-        data = yaml.safe_load(handle)
-    return data if isinstance(data, dict) else {}

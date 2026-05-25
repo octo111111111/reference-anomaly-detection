@@ -2,6 +2,8 @@ doi_title_match_high_risk_threshold: 0.6
 doi_title_match_medium_risk_threshold: 0.8
 doi_journal_match_threshold: 0.75
 doi_year_tolerance: 1
+doi_resolve_threshold: 0.85
+doi_resolve_max_candidates: 5
 max_api_retry: 3
 api_timeout_seconds: 10
 cache_enabled: true

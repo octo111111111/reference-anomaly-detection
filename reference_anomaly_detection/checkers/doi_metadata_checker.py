@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
 
 import yaml
-from rapidfuzz import fuzz
 
 from reference_anomaly_detection.models.schemas import (
     DoiCheckInput,
@@ -18,6 +16,8 @@ from reference_anomaly_detection.services.crossref_client import (
     CrossrefClientError,
     CrossrefWork,
 )
+from reference_anomaly_detection.services.journal_match import JournalMatcher
+from reference_anomaly_detection.services.text_match import normalize_text, text_similarity
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 
@@ -28,21 +28,6 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
     return data if isinstance(data, dict) else {}
-
-
-def _normalize_text(value: str | None) -> str:
-    if not value:
-        return ""
-    text = value.lower()
-    text = re.sub(r"[^\w\s\u4e00-\u9fff]", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def _similarity(a: str | None, b: str | None) -> float | None:
-    na, nb = _normalize_text(a), _normalize_text(b)
-    if not na or not nb:
-        return None
-    return fuzz.token_set_ratio(na, nb) / 100.0
 
 
 class DoiMetadataChecker:
@@ -57,7 +42,6 @@ class DoiMetadataChecker:
     ) -> None:
         self.crossref = crossref_client or CrossrefClient()
         thresholds = _load_yaml(thresholds_path or _CONFIG_DIR / "thresholds.yaml")
-        aliases = _load_yaml(journal_aliases_path or _CONFIG_DIR / "journal_aliases.yaml")
 
         self.title_high_threshold = float(
             thresholds.get("doi_title_match_high_risk_threshold", 0.6)
@@ -69,50 +53,9 @@ class DoiMetadataChecker:
             thresholds.get("doi_journal_match_threshold", 0.75)
         )
         self.year_tolerance = int(thresholds.get("doi_year_tolerance", 1))
-        self._journal_aliases = self._build_alias_index(aliases)
-
-    @staticmethod
-    def _build_alias_index(aliases: dict[str, Any]) -> dict[str, set[str]]:
-        index: dict[str, set[str]] = {}
-        for canonical, variants in aliases.items():
-            names = {_normalize_text(canonical)}
-            if isinstance(variants, list):
-                names.update(_normalize_text(v) for v in variants if v)
-            index[_normalize_text(canonical)] = names
-            for variant in variants if isinstance(variants, list) else []:
-                key = _normalize_text(variant)
-                index.setdefault(key, set()).update(names)
-        return index
-
-    def _journal_candidates(self, name: str | None) -> set[str]:
-        normalized = _normalize_text(name)
-        if not normalized:
-            return set()
-        candidates = {normalized}
-        if normalized in self._journal_aliases:
-            candidates.update(self._journal_aliases[normalized])
-        for key, group in self._journal_aliases.items():
-            if normalized in group or key == normalized:
-                candidates.update(group)
-                candidates.add(key)
-        return candidates
-
-    def _journal_similarity(
-        self, ref_journal: str | None, crossref_journal: str | None
-    ) -> float | None:
-        if not ref_journal or not crossref_journal:
-            return None
-        ref_candidates = self._journal_candidates(ref_journal)
-        crossref_candidates = self._journal_candidates(crossref_journal)
-        best = 0.0
-        for left in ref_candidates:
-            for right in crossref_candidates:
-                score = fuzz.token_set_ratio(left, right) / 100.0
-                best = max(best, score)
-        direct = _similarity(ref_journal, crossref_journal)
-        if direct is not None:
-            best = max(best, direct)
-        return best
+        self._journal_matcher = JournalMatcher(
+            journal_aliases_path or _CONFIG_DIR / "journal_aliases.yaml"
+        )
 
     def _year_matches(self, ref_year: int | None, crossref_year: int | None) -> bool | None:
         if ref_year is None or crossref_year is None:
@@ -172,8 +115,15 @@ class DoiMetadataChecker:
             return "title_possible_mismatch"
         return None
 
-    def check_reference(self, reference: ReferenceItem) -> DoiCheckResult:
-        doi = reference.doi
+    def check_reference(
+        self,
+        reference: ReferenceItem,
+        *,
+        doi_override: str | None = None,
+        doi_source: str | None = None,
+    ) -> DoiCheckResult:
+        doi = doi_override or reference.doi
+        source = doi_source or ("reference" if reference.doi else None)
         if doi:
             doi = self.crossref.normalize_doi(doi)
 
@@ -181,6 +131,7 @@ class DoiMetadataChecker:
             return DoiCheckResult(
                 ref_id=reference.ref_id,
                 doi=None,
+                doi_source=None,
                 doi_exists=None,
                 metadata_match_score=None,
                 matched_title=None,
@@ -202,6 +153,7 @@ class DoiMetadataChecker:
             return DoiCheckResult(
                 ref_id=reference.ref_id,
                 doi=doi,
+                doi_source=source,
                 doi_exists=None,
                 metadata_match_score=None,
                 matched_title=None,
@@ -216,6 +168,7 @@ class DoiMetadataChecker:
             return DoiCheckResult(
                 ref_id=reference.ref_id,
                 doi=doi,
+                doi_source=source,
                 doi_exists=False,
                 metadata_match_score=0.0,
                 matched_title=False,
@@ -226,8 +179,10 @@ class DoiMetadataChecker:
                 risk_flag="doi_not_found",
             )
 
-        title_score = _similarity(reference.title, work.title)
-        journal_score = self._journal_similarity(reference.journal, work.journal)
+        title_score = text_similarity(reference.title, work.title)
+        journal_score = self._journal_matcher.similarity(
+            reference.journal, work.journal
+        )
         year_matches = self._year_matches(reference.year, work.year)
         year_score = self._year_score(reference.year, work.year)
 
@@ -257,6 +212,7 @@ class DoiMetadataChecker:
         return DoiCheckResult(
             ref_id=reference.ref_id,
             doi=doi,
+            doi_source=source,
             doi_exists=True,
             metadata_match_score=metadata_match_score,
             matched_title=matched_title if reference.title else None,
@@ -267,8 +223,27 @@ class DoiMetadataChecker:
             risk_flag=risk_flag,
         )
 
-    def check(self, paper_input: DoiCheckInput) -> DoiCheckBatchResult:
-        checks = [self.check_reference(ref) for ref in paper_input.references]
+    def check(
+        self,
+        paper_input: DoiCheckInput,
+        *,
+        resolved_dois: dict[str, str] | None = None,
+    ) -> DoiCheckBatchResult:
+        checks: list[DoiCheckResult] = []
+        resolved = resolved_dois or {}
+        for ref in paper_input.references:
+            checks.append(self.check_reference(ref))
+            if not ref.doi and ref.ref_id in resolved:
+                resolved_ref = ref.model_copy(
+                    update={"ref_id": f"{ref.ref_id}-resolved"}
+                )
+                checks.append(
+                    self.check_reference(
+                        resolved_ref,
+                        doi_override=resolved[ref.ref_id],
+                        doi_source="resolved",
+                    )
+                )
         return DoiCheckBatchResult(
             paper_id=paper_input.paper_id,
             doi_checks=checks,

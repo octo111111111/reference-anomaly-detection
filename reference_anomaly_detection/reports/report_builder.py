@@ -26,6 +26,7 @@ _DOI_SEVERITY: dict[str, str] = {
 
 _RETRACTION_SEVERITY: dict[str, str] = {
     "cites_retracted_work": "high",
+    "cites_retracted_work_title_possible": "medium",
     "cites_retraction_notice": "medium",
 }
 
@@ -41,7 +42,16 @@ _DOI_ACTIONS: dict[str, str] = {
 
 _RETRACTION_ACTIONS: dict[str, str] = {
     "cites_retracted_work": "请编辑复核是否引用已撤稿原文，并确认正文是否已说明",
+    "cites_retracted_work_title_possible": (
+        "题名模糊匹配到可能已撤稿文献，请人工核对是否为同一篇并确认引用是否恰当"
+    ),
     "cites_retraction_notice": "请确认引用撤稿通知文献是否符合写作规范",
+}
+
+_RETRACTION_CONFIDENCE: dict[str, float] = {
+    "cites_retracted_work": 0.95,
+    "cites_retracted_work_title_possible": 0.75,
+    "cites_retraction_notice": 0.85,
 }
 
 _SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
@@ -139,7 +149,10 @@ class RiskReportBuilder:
                 retraction = retraction_by_ref.get(ref_id)
                 if retraction is None:
                     continue
-                if retraction.risk_flag == "cites_retracted_work":
+                if retraction.risk_flag in {
+                    "cites_retracted_work",
+                    "cites_retracted_work_title_possible",
+                }:
                     retracted += 1
                 elif retraction.risk_flag == "cites_retraction_notice":
                     retraction_notice += 1
@@ -178,9 +191,20 @@ class RiskReportBuilder:
                 parts.append(
                     f"参考文献中 {stats.doi_issue_count} 条存在 DOI/元数据风险"
                 )
-            if retraction_flag_counts.get("cites_retracted_work"):
+            retracted_doi = retraction_flag_counts.get("cites_retracted_work", 0)
+            retracted_title = retraction_flag_counts.get(
+                "cites_retracted_work_title_possible", 0
+            )
+            if retracted_doi or retracted_title:
+                detail = []
+                if retracted_doi:
+                    detail.append(f"{retracted_doi} 条经 DOI 匹配")
+                if retracted_title:
+                    detail.append(f"{retracted_title} 条经题名模糊匹配")
                 parts.append(
-                    f"{stats.retracted_reference_count} 条引用已被撤稿的原文"
+                    f"{stats.retracted_reference_count} 条引用可能为已撤稿原文（"
+                    + "，".join(detail)
+                    + "）"
                 )
             if retraction_flag_counts.get("cites_retraction_notice"):
                 parts.append(
@@ -236,12 +260,13 @@ class RiskReportBuilder:
         for flag, count in sorted(retraction_flag_counts.items()):
             if count == 0 or flag not in _RETRACTION_SEVERITY:
                 continue
+            base_conf = _RETRACTION_CONFIDENCE.get(flag, 0.8)
             items.append(
                 RiskItem(
                     risk_type=flag,
                     severity=_RETRACTION_SEVERITY[flag],
-                    confidence=min(0.98, 0.7 + 0.1 * count),
-                    evidence=f"{count} 条参考文献标记为 {flag}",
+                    confidence=min(0.98, base_conf + 0.05 * (count - 1)),
+                    evidence=self._retraction_evidence(flag, count, retraction_by_ref),
                     location="References",
                     review_required=True,
                     suggested_action=_RETRACTION_ACTIONS.get(flag, "请人工复核"),
@@ -249,6 +274,26 @@ class RiskReportBuilder:
             )
 
         return items
+
+    @staticmethod
+    def _retraction_evidence(
+        flag: str,
+        count: int,
+        retraction_by_ref: dict[str, RetractionCheckResult],
+    ) -> str:
+        if flag == "cites_retracted_work_title_possible":
+            examples = [
+                c.matched_title
+                for c in retraction_by_ref.values()
+                if c.risk_flag == flag and c.matched_title
+            ][:2]
+            if examples:
+                return (
+                    f"{count} 条参考文献经题名模糊匹配到撤稿记录（示例："
+                    + "；".join(examples)
+                    + "），需人工确认"
+                )
+        return f"{count} 条参考文献标记为 {flag}"
 
     @staticmethod
     def _overall_confidence(stats: RiskSummaryStats) -> float:

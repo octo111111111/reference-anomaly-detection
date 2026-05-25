@@ -18,6 +18,7 @@ from reference_anomaly_detection.parsers.document_parser import DocumentParser
 from reference_anomaly_detection.parsers.reference_extractor import ReferenceExtractor
 from reference_anomaly_detection.reports.report_builder import RiskReportBuilder
 from reference_anomaly_detection.services.crossref_client import CrossrefClient
+from reference_anomaly_detection.services.doi_resolver import DoiResolver
 from reference_anomaly_detection.services.retraction_watch_index import (
     RetractionWatchIndex,
     RetractionWatchIndexError,
@@ -55,13 +56,20 @@ def run_pipeline(
     if not extracted.references:
         raise ValueError("参考文献区未解析出任何条目")
 
-    log("模块三：DOI 与元数据校验…")
     crossref = CrossrefClient(mailto=mailto, cache_enabled=cache_enabled)
+
+    log("书目解析：为无 DOI 条目检索 Crossref…")
+    doi_resolve_results, resolved_dois = DoiResolver(crossref_client=crossref).resolve_batch(
+        extracted.references,
+    )
+
+    log("模块三：DOI 与元数据校验…")
     doi_batch = DoiMetadataChecker(crossref_client=crossref).check(
         DoiCheckInput(
             paper_id=extracted.paper_id,
             references=extracted.references,
         ),
+        resolved_dois=resolved_dois,
     )
 
     retraction_skipped = skip_retraction
@@ -82,6 +90,7 @@ def run_pipeline(
                     paper_id=extracted.paper_id,
                     references=extracted.references,
                 ),
+                resolved_dois=resolved_dois,
             )
         except RetractionWatchIndexError as exc:
             retraction_skipped = True
@@ -104,6 +113,7 @@ def run_pipeline(
     intermediates: dict[str, Any] = {
         "parse": parsed,
         "extract": extracted,
+        "doi_resolve": doi_resolve_results,
         "doi_checks": doi_batch,
         "retraction_checks": retraction_batch,
     }

@@ -40,6 +40,13 @@ class TestRetractionWatchIndex:
         assert record is not None
         assert record.original_doi == ORIGINAL_DOI
 
+    def test_lookup_by_title(self, retraction_index: RetractionWatchIndex) -> None:
+        matches = retraction_index.lookup_by_title(
+            "Local government in Thailand: A way forward"
+        )
+        assert matches
+        assert matches[0][1] >= 0.85
+
     def test_missing_index_raises(self, tmp_path: Path) -> None:
         with pytest.raises(RetractionWatchIndexError, match="撤稿索引不存在"):
             RetractionWatchIndex(tmp_path / "missing.sqlite")
@@ -87,6 +94,65 @@ class TestRetractionChecker:
         )
         assert result.is_retracted is False
         assert result.risk_flag is None
+
+    def test_title_match_without_doi(self, retraction_index: RetractionWatchIndex) -> None:
+        checker = RetractionChecker(retraction_index)
+        result = checker.check_reference(
+            ReferenceItem(
+                ref_id="R010",
+                raw_text="ref",
+                title="Local government in Thailand: A way forward",
+                journal="Cogent Social Sciences",
+            )
+        )
+        assert result.is_retracted is True
+        assert result.risk_flag == "cites_retracted_work"
+        assert result.match_method == "title"
+        assert result.title_match_score is not None
+        assert result.title_match_score >= 0.92
+
+    def test_title_low_similarity_no_match(
+        self, retraction_index: RetractionWatchIndex
+    ) -> None:
+        checker = RetractionChecker(retraction_index)
+        result = checker.check_reference(
+            ReferenceItem(
+                ref_id="R011",
+                raw_text="ref",
+                title="Unrelated quantum mechanics review",
+            )
+        )
+        assert result.is_retracted is False
+        assert result.risk_flag is None
+
+    def test_doi_takes_priority_over_title(
+        self, retraction_index: RetractionWatchIndex
+    ) -> None:
+        checker = RetractionChecker(retraction_index)
+        result = checker.check_reference(
+            ReferenceItem(
+                ref_id="R012",
+                raw_text="ref",
+                title="Local government in Thailand",
+                doi="10.1000/unknown.article",
+            )
+        )
+        assert result.is_retracted is False
+        assert result.match_method is None
+
+    def test_resolved_doi_match(self, retraction_index: RetractionWatchIndex) -> None:
+        checker = RetractionChecker(retraction_index)
+        result = checker.check_reference(
+            ReferenceItem(
+                ref_id="R013",
+                raw_text="ref",
+                title="Some title",
+            ),
+            resolved_doi=ORIGINAL_DOI,
+        )
+        assert result.is_retracted is True
+        assert result.risk_flag == "cites_retracted_work"
+        assert result.match_method == "doi"
 
     def test_clean_doi(self, retraction_index: RetractionWatchIndex) -> None:
         checker = RetractionChecker(retraction_index)

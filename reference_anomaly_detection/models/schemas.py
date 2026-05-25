@@ -60,9 +60,17 @@ class DoiCheckInput(BaseModel):
     references: list[ReferenceItem] = Field(default_factory=list)
 
 
+class DoiResolveResult(BaseModel):
+    ref_id: str
+    resolved_doi: str | None = None
+    resolve_score: float | None = None
+    resolve_source: str | None = None
+
+
 class DoiCheckResult(BaseModel):
     ref_id: str
     doi: str | None = None
+    doi_source: Literal["reference", "resolved"] | None = None
     doi_exists: bool | None = None
     metadata_match_score: float | None = None
     matched_title: bool | None = None
@@ -92,6 +100,9 @@ class RetractionCheckResult(BaseModel):
     retraction_date: str | None = None
     reason: str | None = None
     risk_flag: str | None = None
+    match_method: Literal["doi", "title"] | None = None
+    title_match_score: float | None = None
+    matched_title: str | None = None
 
 
 class RetractionCheckBatchResult(BaseModel):
