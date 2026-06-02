@@ -6,5 +6,10 @@ __pycache__/
 dist/
 build/
 reference_anomaly_detection/tests/fixtures/
+data/*
+!data/.gitkeep
 data/RetractionWatch.csv
+reports/*
+!reports/.gitkeep
 **/retraction_watch_index.sqlite
+**/.cache/

@@ -389,44 +389,85 @@ reference title（FTS 召回 + rapidfuzz）→ 撤稿记录 title
 | 引用已撤稿文献 | 高 | 需确认是否已说明撤稿状态 |
 | 无 DOI 且无法补全 | 低到中 | 只提示复核 |
 
-## 8. 推荐目录结构
+## 8. 仓库目录结构（当前实现）
 
 ```text
-reference_anomaly_detection/
-  config/
-    thresholds.yaml
-    journal_aliases.yaml
-    publisher_aliases.yaml
-    retraction_watch_index.csv
-
-  parsers/
-    document_parser.py
-    reference_extractor.py
-    citation_context_extractor.py
-
-  checkers/
-    doi_metadata_checker.py
-    retraction_checker.py
-
-  services/
-    crossref_client.py
-    pubmed_client.py
-    openalex_client.py
-
-  models/
-    schemas.py
-
-  reports/
-    report_builder.py
-
-  tests/
-    test_document_parser.py
-    test_reference_extractor.py
-    test_doi_metadata_checker.py
-    test_retraction_checker.py
-
-  main.py
+reference-anomaly-detection/          # 仓库根
+├── README.md
+├── architecture.md                   # 本文档
+├── pyproject.toml                    # 包元数据、CLI 入口、pytest
+├── docs/
+│   └── 使用指南.md                   # 安装、CLI、Python API、FAQ
+├── data/                             # 运行时数据目录（不入库大文件）
+│   └── .gitkeep                      # 将 RetractionWatch.csv 放于此
+├── reports/                          # CLI 输出目录（运行产物不入库）
+│   └── .gitkeep
+└── reference_anomaly_detection/      # Python 包
+    ├── __init__.py
+    ├── pipeline.py                   # 模块一至五编排（库/API 主入口）
+    ├── run_main.py                   # CLI: reference-run
+    ├── main.py                       # CLI: reference-parse
+    ├── extract_main.py             # CLI: reference-extract
+    ├── doi_check_main.py           # CLI: reference-check-doi
+    ├── build_retraction_index_main.py  # CLI: reference-build-retraction-index
+    ├── retraction_check_main.py    # CLI: reference-check-retraction
+    ├── summarize_main.py           # CLI: reference-summarize
+    ├── config/
+    │   ├── thresholds.yaml         # DOI 相似度、书目解析、API 超时
+    │   ├── retraction.yaml         # 撤稿索引路径、题名匹配阈值
+    │   └── journal_aliases.yaml    # 期刊别名
+    ├── parsers/                    # 模块一、二
+    │   ├── document_parser.py
+    │   ├── reference_extractor.py
+    │   └── citation_context_extractor.py
+    ├── checkers/                   # 模块三、四
+    │   ├── doi_metadata_checker.py
+    │   └── retraction_checker.py
+    ├── services/                   # 外部数据与索引
+    │   ├── crossref_client.py
+    │   ├── doi_resolver.py
+    │   ├── retraction_watch_index.py
+    │   ├── journal_match.py
+    │   └── text_match.py
+    ├── models/
+    │   └── schemas.py              # Pydantic 输入/输出契约
+    ├── reports/
+    │   └── report_builder.py       # 模块五：风险汇总
+    ├── utils/
+    │   └── paper_id.py
+    └── tests/
+        ├── conftest.py             # 自动生成 fixtures/sample_paper.pdf
+        ├── data/retraction_watch_sample.csv
+        └── test_*.py
 ```
+
+### 8.1 模块与文件映射
+
+| 模块 | 职责 | 核心代码 | CLI |
+|------|------|----------|-----|
+| 一 | PDF/Word 解析 | `parsers/document_parser.py` | `reference-parse` |
+| 二 | 参考文献结构化 | `parsers/reference_extractor.py` | `reference-extract` |
+| 三 | DOI / Crossref 校验 | `checkers/doi_metadata_checker.py`、`services/doi_resolver.py` | `reference-check-doi` |
+| 四 | 撤稿检测 | `checkers/retraction_checker.py`、`services/retraction_watch_index.py` | `reference-check-retraction` |
+| 五 | 风险汇总 | `reports/report_builder.py` | `reference-summarize` |
+| 编排 | 一键流水线 | `pipeline.py` | `reference-run` |
+| 运维 | 构建撤稿索引 | `services/retraction_watch_index.py` | `reference-build-retraction-index` |
+
+### 8.2 运行时生成、不入库的路径
+
+| 路径 | 说明 |
+|------|------|
+| `data/RetractionWatch.csv` | 从官网下载的撤稿库源文件（gitignore） |
+| `reference_anomaly_detection/config/retraction_watch_index.sqlite` | 撤稿本地索引（gitignore） |
+| `~/.cache/reference-anomaly-detection/crossref_cache.sqlite` | Crossref 查询缓存 |
+| `reference_anomaly_detection/tests/fixtures/` | pytest 自动生成的样例 PDF/DOCX |
+| `reports/*.json` | CLI `--output` 检测结果（gitignore） |
+
+### 8.3 未实现、仅架构预留
+
+- `services/pubmed_client.py`、`services/openalex_client.py`
+- `config/publisher_aliases.yaml`
+- `checkers/concentration_checker.py` 等扩展检测器
 
 ## 9. 统一数据结构
 

@@ -93,7 +93,21 @@ reference-run --file path/to/paper.pdf --output reports/summary.json
 ## 文档
 
 - **[使用指南](docs/使用指南.md)**：环境、分步 CLI、Python API、FAQ  
-- **[架构设计](architecture.md)**：模块边界、输入输出、扩展规划  
+- **[架构设计](architecture.md)**：仓库目录、五模块边界、输入输出、扩展规划  
+
+## 仓库目录
+
+```text
+reference-anomaly-detection/
+├── reference_anomaly_detection/   # Python 包（parsers / checkers / services / pipeline）
+├── data/                          # 放置 RetractionWatch.csv（不入库）
+├── reports/                       # CLI 输出目录（运行产物不入库）
+├── docs/                          # 使用指南
+├── architecture.md                # 架构与目录说明
+└── pyproject.toml
+```
+
+详见 [architecture.md §8](architecture.md#8-仓库目录结构当前实现)。
 
 ## 开发
 
