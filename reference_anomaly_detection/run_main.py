@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from reference_anomaly_detection.models.schemas import DoiResolveBatchResult
 from reference_anomaly_detection.pipeline import print_cli_summary, run_pipeline
 
 
@@ -49,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mailto",
-        default="reference-anomaly-detection@example.com",
+        default="zhangyuyue@bupt.edu.cn",
         help="Crossref polite pool 联系邮箱",
     )
     return parser
@@ -84,9 +85,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.save_intermediate:
         out_dir = args.save_intermediate
         out_dir.mkdir(parents=True, exist_ok=True)
+        doi_resolve_batch = DoiResolveBatchResult(
+            paper_id=report.paper_id,
+            doi_resolve_results=intermediates["doi_resolve"],
+        )
         mapping = {
             "parse.json": intermediates["parse"],
             "extract.json": intermediates["extract"],
+            "doi_resolve.json": doi_resolve_batch,
             "doi_checks.json": intermediates["doi_checks"],
         }
         if intermediates["retraction_checks"] is not None:

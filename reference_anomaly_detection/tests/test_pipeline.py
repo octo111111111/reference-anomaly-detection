@@ -116,3 +116,4 @@ class TestRunPipeline:
         payload = json.loads(captured.out)
         assert payload["module"] == "reference_anomaly_detection"
         assert "summary" in payload
+        assert "reference_findings" in payload

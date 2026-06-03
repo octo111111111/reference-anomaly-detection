@@ -18,7 +18,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0.0"]
+dev = ["pytest>=7.0.0", "httpx>=0.27.0"]
+api = ["fastapi>=0.110.0", "uvicorn[standard]>=0.27.0", "python-multipart>=0.0.9"]
 
 [project.scripts]
 reference-parse = "reference_anomaly_detection.main:main"
@@ -28,6 +29,7 @@ reference-build-retraction-index = "reference_anomaly_detection.build_retraction
 reference-check-retraction = "reference_anomaly_detection.retraction_check_main:main"
 reference-summarize = "reference_anomaly_detection.summarize_main:main"
 reference-run = "reference_anomaly_detection.run_main:main"
+reference-api = "reference_anomaly_detection.api_main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -60,8 +60,20 @@ class DoiCheckInput(BaseModel):
     references: list[ReferenceItem] = Field(default_factory=list)
 
 
+CrossrefSearchStatus = Literal[
+    "not_needed",
+    "skipped_no_title",
+    "api_error",
+    "no_candidates",
+    "low_score",
+    "resolved",
+    "unknown",
+]
+
+
 class DoiResolveResult(BaseModel):
     ref_id: str
+    crossref_search_status: CrossrefSearchStatus = "unknown"
     resolved_doi: str | None = None
     resolve_score: float | None = None
     resolve_source: str | None = None
@@ -84,6 +96,12 @@ class DoiCheckResult(BaseModel):
 class DoiCheckBatchResult(BaseModel):
     paper_id: str
     doi_checks: list[DoiCheckResult] = Field(default_factory=list)
+    doi_resolve_results: list[DoiResolveResult] = Field(default_factory=list)
+
+
+class DoiResolveBatchResult(BaseModel):
+    paper_id: str
+    doi_resolve_results: list[DoiResolveResult] = Field(default_factory=list)
 
 
 class RetractionCheckInput(BaseModel):
@@ -114,9 +132,26 @@ class RiskSummaryInput(BaseModel):
     paper_id: str
     references: list[ReferenceItem] = Field(default_factory=list)
     doi_checks: list[DoiCheckResult] = Field(default_factory=list)
+    doi_resolve_results: list[DoiResolveResult] = Field(default_factory=list)
     retraction_checks: list[RetractionCheckResult] = Field(default_factory=list)
     retraction_check_skipped: bool = False
     retraction_skip_reason: str | None = None
+
+
+class ReferenceFinding(BaseModel):
+    """单条参考文献的检测摘要（含 Crossref 题名检索状态）。"""
+
+    ref_id: str
+    reference_index: int
+    has_reference_doi: bool
+    crossref_title_search_status: CrossrefSearchStatus
+    crossref_resolved_doi: str | None = None
+    crossref_resolve_score: float | None = None
+    doi_risk_flag: str | None = None
+    doi_check_from_resolve: bool = False
+    doi_check_from_resolve_risk_flag: str | None = None
+    retraction_risk_flag: str | None = None
+    retraction_match_method: Literal["doi", "title"] | None = None
 
 
 class RiskItem(BaseModel):
@@ -124,6 +159,7 @@ class RiskItem(BaseModel):
     severity: Literal["high", "medium", "low"]
     confidence: float
     evidence: str
+    ref_ids: list[str] = Field(default_factory=list)
     location: str = "References"
     review_required: bool = True
     suggested_action: str
@@ -136,6 +172,7 @@ class RiskSummaryStats(BaseModel):
     doi_not_found_count: int = 0
     doi_mismatch_count: int = 0
     doi_issue_count: int = 0
+    crossref_title_search_unresolved_count: int = 0
     retracted_reference_count: int = 0
     retraction_notice_count: int = 0
 
@@ -143,6 +180,7 @@ class RiskSummaryStats(BaseModel):
 class RiskSummaryResult(BaseModel):
     module: str = "reference_anomaly_detection"
     paper_id: str
+    reference_findings: list[ReferenceFinding] = Field(default_factory=list)
     risk_items: list[RiskItem] = Field(default_factory=list)
     summary: RiskSummaryStats
     retraction_check_skipped: bool = False

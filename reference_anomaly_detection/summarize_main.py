@@ -7,6 +7,7 @@ from pathlib import Path
 
 from reference_anomaly_detection.models.schemas import (
     DoiCheckBatchResult,
+    DoiResolveResult,
     ReferenceExtractResult,
     RetractionCheckBatchResult,
     RiskSummaryInput,
@@ -38,6 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="模块四 JSON；省略则视为未执行撤稿检测",
     )
     parser.add_argument(
+        "--from-doi-resolve",
+        type=Path,
+        help="书目解析 JSON（含 doi_resolve_results）；省略时从模块三 JSON 读取",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         help="汇总 JSON 输出路径；省略则打印到 stdout",
@@ -67,6 +73,17 @@ def main(argv: list[str] | None = None) -> int:
     extract_result = ReferenceExtractResult.model_validate(extract_payload)
     doi_result = DoiCheckBatchResult.model_validate(doi_payload)
 
+    doi_resolve_results = list(doi_result.doi_resolve_results)
+    if args.from_doi_resolve:
+        resolve_payload = json.loads(
+            args.from_doi_resolve.read_text(encoding="utf-8"),
+        )
+        raw_results = resolve_payload.get("doi_resolve_results", resolve_payload)
+        if isinstance(raw_results, list):
+            doi_resolve_results = [
+                DoiResolveResult.model_validate(item) for item in raw_results
+            ]
+
     retraction_skipped = args.from_retraction is None
     skip_reason = "未提供模块四 JSON" if retraction_skipped else None
     retraction_checks: list = []
@@ -90,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
             paper_id=paper_id,
             references=extract_result.references,
             doi_checks=doi_result.doi_checks,
+            doi_resolve_results=doi_resolve_results,
             retraction_checks=retraction_checks,
             retraction_check_skipped=retraction_skipped,
             retraction_skip_reason=skip_reason,

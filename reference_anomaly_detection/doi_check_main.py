@@ -8,6 +8,7 @@ from pathlib import Path
 from reference_anomaly_detection.checkers.doi_metadata_checker import DoiMetadataChecker
 from reference_anomaly_detection.models.schemas import DoiCheckInput, ReferenceItem
 from reference_anomaly_detection.services.crossref_client import CrossrefClient
+from reference_anomaly_detection.services.doi_resolver import DoiResolver
 from reference_anomaly_detection.utils.paper_id import inherit_paper_id
 
 
@@ -33,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mailto",
-        default="reference-anomaly-detection@example.com",
+        default="zhangyuyue@bupt.edu.cn",
         help="Crossref polite pool 联系邮箱",
     )
     return parser
@@ -56,10 +57,14 @@ def main(argv: list[str] | None = None) -> int:
         mailto=args.mailto,
         cache_enabled=not args.no_cache,
     )
+    resolver = DoiResolver(crossref_client=client)
+    doi_resolve_results, resolved_dois = resolver.resolve_batch(references)
     checker = DoiMetadataChecker(crossref_client=client)
     result = checker.check(
         DoiCheckInput(paper_id=paper_id, references=references),
+        resolved_dois=resolved_dois,
     )
+    result = result.model_copy(update={"doi_resolve_results": doi_resolve_results})
     output = result.model_dump(mode="json")
 
     if args.output:

@@ -28,9 +28,11 @@ from reference_anomaly_detection.services.retraction_watch_index import (
 def run_pipeline(
     file_path: Path | str,
     *,
+    paper_id: str | None = None,
     file_type: str | None = None,
-    mailto: str = "reference-anomaly-detection@example.com",
+    mailto: str = "zhangyuyue@bupt.edu.cn",
     cache_enabled: bool = True,
+    crossref_cache_path: Path | str | None = None,
     retraction_db: Path | str | None = None,
     skip_retraction: bool = False,
     on_progress: Callable[[str], None] | None = None,
@@ -41,7 +43,11 @@ def run_pipeline(
 
     log("模块一：解析论文…")
     parsed = DocumentParser().parse(
-        PaperParseInput(file_path=path, file_type=file_type),
+        PaperParseInput(
+            file_path=path,
+            file_type=file_type,
+            paper_id=paper_id,
+        ),
     )
     if not parsed.reference_section_text:
         raise ValueError("未识别到参考文献区，无法继续检测")
@@ -56,7 +62,11 @@ def run_pipeline(
     if not extracted.references:
         raise ValueError("参考文献区未解析出任何条目")
 
-    crossref = CrossrefClient(mailto=mailto, cache_enabled=cache_enabled)
+    crossref = CrossrefClient(
+        mailto=mailto,
+        cache_enabled=cache_enabled,
+        cache_path=crossref_cache_path,
+    )
 
     log("书目解析：为无 DOI 条目检索 Crossref…")
     doi_resolve_results, resolved_dois = DoiResolver(crossref_client=crossref).resolve_batch(
@@ -102,6 +112,7 @@ def run_pipeline(
         paper_id=extracted.paper_id,
         references=extracted.references,
         doi_checks=doi_batch.doi_checks,
+        doi_resolve_results=doi_resolve_results,
         retraction_checks=(
             retraction_batch.retraction_checks if retraction_batch else []
         ),
@@ -129,6 +140,7 @@ def format_cli_summary(report: RiskSummaryResult) -> str:
         (
             f"DOI 校验: 存在 {stats.doi_found_count} 条 | "
             f"无 DOI {stats.doi_missing_count} 条 | "
+            f"题名检索仍未解析 DOI {stats.crossref_title_search_unresolved_count} 条 | "
             f"DOI 不存在 {stats.doi_not_found_count} 条 | "
             f"元数据不一致 {stats.doi_mismatch_count} 条"
         ),

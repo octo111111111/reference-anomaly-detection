@@ -28,6 +28,7 @@ class TestDoiResolver:
             year=2020,
         )
         result = resolver.resolve_reference(ref)
+        assert result.crossref_search_status == "resolved"
         assert result.resolved_doi == "10.1000/resolved.1"
         assert result.resolve_score is not None
         assert result.resolve_score >= 0.85
@@ -43,6 +44,7 @@ class TestDoiResolver:
             doi="10.1000/existing",
         )
         result = resolver.resolve_reference(ref)
+        assert result.crossref_search_status == "not_needed"
         assert result.resolved_doi is None
         client.search_works_by_bibliographic.assert_not_called()
 
@@ -66,4 +68,5 @@ class TestDoiResolver:
             year=2020,
         )
         result = resolver.resolve_reference(ref)
+        assert result.crossref_search_status == "low_score"
         assert result.resolved_doi is None

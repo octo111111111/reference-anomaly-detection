@@ -39,7 +39,7 @@ python -m venv .venv
 # macOS / Linux
 # source .venv/bin/activate
 
-pip install -e ".[dev]"
+pip install -e ".[dev,api]"
 ```
 
 ### 构建撤稿索引（生产环境必做）
@@ -81,6 +81,28 @@ reference-run --file path/to/paper.pdf --output reports/summary.json
 | `reference-build-retraction-index` | 构建撤稿 SQLite 索引 |
 | `reference-check-retraction` | 模块四：撤稿检测 |
 | `reference-summarize` | 模块五：风险汇总 |
+| `reference-api` | HTTP 微服务（FastAPI） |
+
+## 微服务部署
+
+安装 API 依赖后启动 HTTP 服务（默认端口 **18080**，可通过环境变量修改）：
+
+```bash
+pip install -e ".[api]"
+cp .env.example .env   # 编辑 CROSSREF_MAILTO、RETRACTION_DB、REFERENCE_API_PORT
+
+reference-api
+# 或指定端口：reference-api --port 18081
+```
+
+| 端点 | 说明 |
+|------|------|
+| `GET /health` | 健康检查（含撤稿索引是否就绪） |
+| `POST /v1/reference-check` | 上传 PDF/Word，返回 `RiskSummaryResult` JSON |
+
+环境变量见 [`.env.example`](.env.example)。systemd 示例见 [`deploy/reference-api.service`](deploy/reference-api.service)。
+
+**服务器上只需改 `.env`（或 systemd EnvironmentFile）**，不必改代码：端口、邮箱、数据库路径均通过环境变量配置。
 
 ## 配置
 

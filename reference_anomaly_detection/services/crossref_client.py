@@ -13,7 +13,7 @@ import requests
 
 from reference_anomaly_detection.services.text_match import normalize_text, text_similarity
 
-DEFAULT_MAILTO = "reference-anomaly-detection@example.com"
+DEFAULT_MAILTO = "zhangyuyue@bupt.edu.cn"
 CROSSREF_WORKS_URL = "https://api.crossref.org/works/{doi}"
 CROSSREF_WORKS_SEARCH_URL = "https://api.crossref.org/works"
 

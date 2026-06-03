@@ -47,8 +47,16 @@ class DoiResolver:
         self._journal_matcher = JournalMatcher()
 
     def resolve_reference(self, reference: ReferenceItem) -> DoiResolveResult:
-        if reference.doi or not reference.title:
-            return DoiResolveResult(ref_id=reference.ref_id)
+        if reference.doi:
+            return DoiResolveResult(
+                ref_id=reference.ref_id,
+                crossref_search_status="not_needed",
+            )
+        if not reference.title:
+            return DoiResolveResult(
+                ref_id=reference.ref_id,
+                crossref_search_status="skipped_no_title",
+            )
 
         author = reference.authors[0] if reference.authors else None
         try:
@@ -60,19 +68,27 @@ class DoiResolver:
                 rows=self.max_candidates,
             )
         except CrossrefClientError:
-            return DoiResolveResult(ref_id=reference.ref_id)
+            return DoiResolveResult(
+                ref_id=reference.ref_id,
+                crossref_search_status="api_error",
+            )
 
         best_doi, best_score = self._pick_best(reference, candidates)
         if best_doi is None or best_score is None:
-            return DoiResolveResult(ref_id=reference.ref_id)
+            return DoiResolveResult(
+                ref_id=reference.ref_id,
+                crossref_search_status="no_candidates",
+            )
         if best_score < self.resolve_threshold:
             return DoiResolveResult(
                 ref_id=reference.ref_id,
+                crossref_search_status="low_score",
                 resolve_score=best_score,
                 resolve_source="crossref_search",
             )
         return DoiResolveResult(
             ref_id=reference.ref_id,
+            crossref_search_status="resolved",
             resolved_doi=best_doi,
             resolve_score=best_score,
             resolve_source="crossref_search",

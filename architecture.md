@@ -363,6 +363,7 @@ reference title（FTS 召回 + rapidfuzz）→ 撤稿记录 title
     "total_references": 52,
     "doi_found_count": 38,
     "doi_missing_count": 14,
+    "crossref_title_search_unresolved_count": 3,
     "doi_not_found_count": 2,
     "doi_mismatch_count": 5,
     "retracted_reference_count": 2

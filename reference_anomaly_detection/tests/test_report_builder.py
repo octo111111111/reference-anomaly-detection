@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from reference_anomaly_detection.models.schemas import (
     DoiCheckResult,
+    DoiResolveResult,
     ReferenceItem,
     RetractionCheckResult,
     RiskSummaryInput,
@@ -28,6 +29,8 @@ class TestRiskReportBuilder:
         assert report.paper_id == "paper_test"
         assert report.module == "reference_anomaly_detection"
         assert report.risk_items == []
+        assert len(report.reference_findings) == 1
+        assert report.reference_findings[0].ref_id == "R001"
         assert report.summary.total_references == 1
         assert report.summary.doi_found_count == 1
         assert report.summary.doi_issue_count == 0
@@ -75,6 +78,38 @@ class TestRiskReportBuilder:
         assert overview.risk_type == "reference_anomaly"
         assert overview.severity == "high"
         assert overview.review_required is True
+        assert set(overview.ref_ids) == {"R001", "R002"}
+
+    def test_missing_doi_shows_crossref_search(self) -> None:
+        report = RiskReportBuilder().build(
+            RiskSummaryInput(
+                paper_id="paper_test",
+                references=[
+                    ReferenceItem(
+                        ref_id="R001",
+                        raw_text="no doi",
+                        title="Example Article",
+                    ),
+                ],
+                doi_checks=[
+                    DoiCheckResult(ref_id="R001", risk_flag="missing_doi"),
+                ],
+                doi_resolve_results=[
+                    DoiResolveResult(
+                        ref_id="R001",
+                        crossref_search_status="no_candidates",
+                    ),
+                ],
+            ),
+        )
+        finding = report.reference_findings[0]
+        assert finding.crossref_title_search_status == "no_candidates"
+        assert finding.has_reference_doi is False
+        assert report.summary.crossref_title_search_unresolved_count == 1
+        missing_item = next(
+            i for i in report.risk_items if i.risk_type == "doi_missing_doi"
+        )
+        assert missing_item.ref_ids == ["R001"]
 
     def test_retraction_skipped_stats(self) -> None:
         report = RiskReportBuilder().build(

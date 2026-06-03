@@ -1,0 +1,15 @@
+[Unit]
+Description=Reference Anomaly Detection API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/reference-anomaly-detection
+EnvironmentFile=/opt/reference-anomaly-detection/.env
+ExecStart=/opt/reference-anomaly-detection/.venv/bin/reference-api
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
